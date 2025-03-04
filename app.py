@@ -673,41 +673,48 @@ def main():
                     st.write(f"### Week {week}")
                     
                     # Filter by week and pivot
-                    week_data = st.session_state.schedule_df[st.session_state.schedule_df["Week"] == week]
-                    pivot = pd.pivot_table(
-                        week_data,
-                        values="Hours",
-                        index=["Day"],
-                        columns=["Grant"],
-                        aggfunc=sum,
-                        fill_value=0
-                    )
-                    
-                    # Add daily totals
-                    pivot["Daily Total"] = pivot.sum(axis=1)
-                    
-                    # Reorder days of the week
-                    day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-                    pivot = pivot.reindex(day_order)
-                    
-                    # Calculate daily utilization
-                    day_utilization = pivot["Daily Total"].apply(lambda x: f"{(x/8)*100:.0f}%" if x > 0 else "0%")
-                    pivot["Utilization"] = day_utilization
-                    
-                    # Create styled dataframe with color highlights for daily totals
-                    def highlight_totals(s):
-                        is_total = s.name == "Daily Total"
-                        return ['background-color: #f2f2f2' if is_total else '' for _ in s]
-                    
-                    # Apply styling
-                    styled_pivot = pivot.style.apply(highlight_totals, axis=1)
-                    
-                    # Display with better formatting
-                    st.dataframe(styled_pivot, use_container_width=True)
-                    
-                    # Calculate week total
-                    week_total = pivot["Daily Total"].sum()
-                    st.info(f"Week {week} Total: {week_total:.2f} hours ({(week_total/40)*100:.0f}% of 40 hour week)")
+                    # Make sure the column exists before filtering
+                    if "Week" in st.session_state.schedule_df.columns:
+                        week_data = st.session_state.schedule_df[st.session_state.schedule_df["Week"] == week]
+                        if not week_data.empty:
+                            pivot = pd.pivot_table(
+                                week_data,
+                                values="Hours",
+                                index=["Day"],
+                                columns=["Grant"],
+                                aggfunc=sum,
+                                fill_value=0
+                            )
+                            
+                            # Add daily totals
+                            pivot["Daily Total"] = pivot.sum(axis=1)
+                            
+                            # Reorder days of the week
+                            day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+                            pivot = pivot.reindex(day_order)
+                            
+                            # Calculate daily utilization
+                            day_utilization = pivot["Daily Total"].apply(lambda x: f"{(x/8)*100:.0f}%" if x > 0 else "0%")
+                            pivot["Utilization"] = day_utilization
+                            
+                            # Create styled dataframe with color highlights for daily totals
+                            def highlight_totals(s):
+                                is_total = s.name == "Daily Total"
+                                return ['background-color: #f2f2f2' if is_total else '' for _ in s]
+                            
+                            # Apply styling
+                            styled_pivot = pivot.style.apply(highlight_totals, axis=1)
+                            
+                            # Display with better formatting
+                            st.dataframe(styled_pivot, use_container_width=True)
+                            
+                            # Calculate week total
+                            week_total = pivot["Daily Total"].sum()
+                            st.info(f"Week {week} Total: {week_total:.2f} hours ({(week_total/40)*100:.0f}% of 40 hour week)")
+                        else:
+                            st.info(f"No data available for Week {week}")
+                    else:
+                        st.error("Data format issue: 'Week' column not found in schedule data")
                 
             with tab3:
                 # Detailed day-by-day breakdown
@@ -720,35 +727,39 @@ def main():
                 for day in days:
                     with st.expander(f"{day}"):
                         for week in [1, 2]:
-                            day_data = st.session_state.schedule_df[
-                                (st.session_state.schedule_df["Day"] == day) & 
-                                (st.session_state.schedule_df["Week"] == week)
-                            ]
-                            
-                            if not day_data.empty:
-                                st.write(f"**Week {week}**")
+                            # Add error handling for DataFrame access
+                            if "Day" in st.session_state.schedule_df.columns and "Week" in st.session_state.schedule_df.columns:
+                                day_data = st.session_state.schedule_df[
+                                    (st.session_state.schedule_df["Day"] == day) & 
+                                    (st.session_state.schedule_df["Week"] == week)
+                                ]
                                 
-                                # Sort by hours descending
-                                day_data = day_data.sort_values("Hours", ascending=False)
-                                
-                                # Create a more visual representation
-                                for _, row in day_data.iterrows():
-                                    # Calculate width as percentage of 8 hours
-                                    width = min(int(row["Hours"] / 8 * 100), 100)
+                                if not day_data.empty:
+                                    st.write(f"**Week {week}**")
                                     
-                                    # Display as a custom progress bar
-                                    st.write(f"{row['Grant']}: {row['Hours']:.2f} hours")
-                                    st.progress(width / 100)
-                                
-                                # Show daily total
-                                daily_total = day_data["Hours"].sum()
-                                st.info(f"Total: {daily_total:.2f} hours ({(daily_total/8)*100:.0f}% of 8 hour day)")
-                                
-                                # Highlight if the day is exactly 8 hours (with more generous tolerance)
-                                if abs(daily_total - 8.0) < 0.05:
-                                    st.success("✓ Perfect 8-hour day!")
+                                    # Sort by hours descending
+                                    day_data = day_data.sort_values("Hours", ascending=False)
+                                    
+                                    # Create a more visual representation
+                                    for _, row in day_data.iterrows():
+                                        # Calculate width as percentage of 8 hours
+                                        width = min(int(row["Hours"] / 8 * 100), 100)
+                                        
+                                        # Display as a custom progress bar
+                                        st.write(f"{row['Grant']}: {row['Hours']:.2f} hours")
+                                        st.progress(width / 100)
+                                    
+                                    # Show daily total
+                                    daily_total = day_data["Hours"].sum()
+                                    st.info(f"Total: {daily_total:.2f} hours ({(daily_total/8)*100:.0f}% of 8 hour day)")
+                                    
+                                    # Highlight if the day is exactly 8 hours (with more generous tolerance)
+                                    if abs(daily_total - 8.0) < 0.05:
+                                        st.success("✓ Perfect 8-hour day!")
+                                else:
+                                    st.write(f"No hours allocated for Week {week}")
                             else:
-                                st.write(f"No hours allocated for Week {week}")
+                                st.write(f"No data available for Week {week}")
                         
                         st.divider()
 
