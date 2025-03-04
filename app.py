@@ -7,6 +7,7 @@ from io import BytesIO
 st.set_page_config(page_title="Grant Hour Allocation Tool", layout="wide")
 
 # Define the list of available grants in the specified order
+# Flipped REA #3 Lincoln and REA #3 Omaha as requested
 AVAILABLE_GRANTS = [
     "FY 24 Matching Grant",
     "ASA #3",
@@ -19,8 +20,8 @@ AVAILABLE_GRANTS = [
     "UHP #1",
     "UHP #4",
     "UHP #5",
-    "REA #3 Lincoln",
     "REA #3 Omaha",
+    "REA #3 Lincoln",
     "Non-Grant"
 ]
 
@@ -383,21 +384,9 @@ def create_summary_dataframe(schedule, grants):
     # Convert to DataFrame
     return pd.DataFrame(records)
 
-def to_excel(df_schedule, df_summary):
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df_schedule.to_excel(writer, sheet_name='Detailed Schedule', index=False)
-        df_summary.to_excel(writer, sheet_name='Summary', index=False)
-        
-        # Format the summary worksheet
-        summary_worksheet = writer.sheets['Summary']
-        summary_worksheet.conditional_format('F2:F100', {'type': 'cell',
-                                            'criteria': '<', 
-                                            'value': 0,
-                                            'format': writer.book.add_format({'bg_color': '#FFC7CE'})})
-    
-    processed_data = output.getvalue()
-    return processed_data
+def export_to_csv(df):
+    """Convert dataframe to CSV format for downloading"""
+    return df.to_csv(index=False).encode("utf-8")
 
 def main():
     st.title("Grant Hour Allocation Tool")
@@ -503,12 +492,27 @@ def main():
             else:
                 st.error("Please add at least one grant")
         
-        # Download button
+        # CSV download buttons (replacing Excel download)
         if 'schedule_df' in st.session_state:
-            excel_data = to_excel(st.session_state.schedule_df, st.session_state.summary_df)
-            b64 = base64.b64encode(excel_data).decode()
-            download_button = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="grant_schedule.xlsx" class="css-16idsys e16nr0p34">Download Excel</a>'
-            st.markdown(download_button, unsafe_allow_html=True)
+            st.subheader("Download Options")
+            
+            # Detailed schedule CSV
+            schedule_csv = export_to_csv(st.session_state.schedule_df)
+            schedule_b64 = base64.b64encode(schedule_csv).decode()
+            st.markdown(
+                f'<a href="data:file/csv;base64,{schedule_b64}" download="schedule_details.csv" '
+                f'class="css-16idsys e16nr0p34">Download Schedule Details (CSV)</a>', 
+                unsafe_allow_html=True
+            )
+            
+            # Summary CSV
+            summary_csv = export_to_csv(st.session_state.summary_df)
+            summary_b64 = base64.b64encode(summary_csv).decode()
+            st.markdown(
+                f'<a href="data:file/csv;base64,{summary_b64}" download="schedule_summary.csv" '
+                f'class="css-16idsys e16nr0p34">Download Schedule Summary (CSV)</a>', 
+                unsafe_allow_html=True
+            )
     
     with col2:
         st.subheader("Selected Grants")
